@@ -1,88 +1,78 @@
+
 pipeline {
     agent any
 
-    environment {
-        DOTNET_ROOT = "${WORKSPACE}/.dotnet"
-        "PATH+DOTNET" = "${WORKSPACE}/.dotnet"
-    }
-
     stages {
-        stage('Build and Test') {
-            when {
-                anyOf {
-                    branch 'main'
-                    branch 'feature'
-                }
+        stage('Checkout Code') {
+            steps {
+                checkout scm
             }
+        }
 
-            stages {
-                stage('Checkout Code') {
-                    steps {
-                        checkout scm
+        stage('Install .NET 6 SDK') {
+            steps {
+                powershell '''
+                    $installDir = Join-Path $env:WORKSPACE ".dotnet"
+                    $dotnetExe = Join-Path $installDir "dotnet.exe"
+
+                    New-Item -ItemType Directory -Force `
+                        -Path $installDir | Out-Null
+
+                    $sdkInstalled = $false
+
+                    if (Test-Path $dotnetExe) {
+                        $sdks = & $dotnetExe --list-sdks
+                        if ($sdks -match '^6\\.0\\.') {
+                            $sdkInstalled = $true
+                        }
                     }
-                }
 
-                stage('Install .NET 6 SDK') {
-                    steps {
-                        powershell '''
-                            $installDir = "$env:WORKSPACE/.dotnet"
-                            $dotnetExe = "$installDir/dotnet.exe"
+                    if (-not $sdkInstalled) {
+                        Write-Host "Installing .NET 6 SDK..."
 
-                            if (!(Test-Path $dotnetExe)) {
-                                Write-Host "Installing .NET 6 SDK..."
+                        $installer = Join-Path $env:TEMP "dotnet-install.ps1"
 
-                                New-Item -ItemType Directory `
-                                    -Force -Path $installDir | Out-Null
+                        Invoke-WebRequest `
+                            -Uri "https://dot.net/v1/dotnet-install.ps1" `
+                            -OutFile $installer
 
-                                $installer = "$env:TEMP/dotnet-install.ps1"
+                        & $installer -Channel 6.0 -InstallDir $installDir
 
-                                Invoke-WebRequest `
-                                    -Uri "https://dot.net/v1/dotnet-install.ps1" `
-                                    -OutFile $installer
-
-                                & $installer `
-                                    -Channel 6.0 `
-                                    -InstallDir $installDir
-
-                                if ($LASTEXITCODE -ne 0) {
-                                    throw ".NET SDK installation failed"
-                                }
-                            } else {
-                                Write-Host ".NET SDK already installed."
-                            }
-
-                            & $dotnetExe --list-sdks
-
-                            if ($LASTEXITCODE -ne 0) {
-                                throw ".NET SDK verification failed"
-                            }
-                        '''
+                        if ($LASTEXITCODE -ne 0) {
+                            throw ".NET 6 SDK installation failed"
+                        }
                     }
-                }
 
-                stage('Setup .NET') {
-                    steps {
-                        bat 'dotnet --version'
-                    }
-                }
+                    & $dotnetExe --list-sdks
 
-                stage('Restore Dependencies') {
-                    steps {
-                        bat 'dotnet restore'
+                    if ($LASTEXITCODE -ne 0) {
+                        throw ".NET SDK verification failed"
                     }
-                }
+                '''
+            }
+        }
 
-                stage('Build') {
-                    steps {
-                        bat 'dotnet build --no-restore'
-                    }
-                }
+        stage('Setup .NET') {
+            steps {
+                bat '"%WORKSPACE%\\.dotnet\\dotnet.exe" --version'
+            }
+        }
 
-                stage('Test') {
-                    steps {
-                        bat 'dotnet test --no-build --verbosity normal'
-                    }
-                }
+        stage('Restore Dependencies') {
+            steps {
+                bat '"%WORKSPACE%\\.dotnet\\dotnet.exe" restore'
+            }
+        }
+
+        stage('Build') {
+            steps {
+                bat '"%WORKSPACE%\\.dotnet\\dotnet.exe" build --no-restore'
+            }
+        }
+
+        stage('Test') {
+            steps {
+                bat '"%WORKSPACE%\\.dotnet\\dotnet.exe" test --no-build --verbosity normal'
             }
         }
     }
