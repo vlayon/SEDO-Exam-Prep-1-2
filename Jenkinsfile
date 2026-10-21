@@ -1,24 +1,24 @@
 pipeline { 
     agent any
 
-tools {
-    // Requires .NET SDK 6 to be configured in Jenkins
-    // under Manage Jenkins → Tools.
-    dotnetsdk 'dotnet-6'
-}
+// tools {
+//     // Requires .NET SDK 6 to be configured in Jenkins
+//     // under Manage Jenkins → Tools.
+//     dotnetsdk 'dotnet-6'
+// }
 
 stages {
-    stage('Checkout Code') {
-        steps {
-            checkout scm
-        }
-    }
+    // stage('Checkout Code') {
+    //     steps {
+    //         checkout scm
+    //     }
+    // }
 
-    stage('Setup .NET') {
-        steps {
-            bat 'dotnet --version'
-        }
-    }
+    // stage('Setup .NET') {
+    //     steps {
+    //         bat 'dotnet --version'
+    //     }
+    // }
 
     stage('Restore Dependencies') {
         steps {
